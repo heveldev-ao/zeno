@@ -2,6 +2,6 @@ export interface Candidato {
   id?: number;
   nome: string;
   email: string;
-  numBI: string;
+  numbi: string;
   created_at?: string;
 }
