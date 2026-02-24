@@ -1,28 +1,36 @@
-const mariadb = require("mariadb");
 require("dotenv").config();
-const { Pool } = require("pg");
 
-// Pool para ambiente de desenvolvimento
-const devPool = new Pool({
-  host: process.env.DEV_DB_HOST,
-  user: process.env.DEV_DB_USER,
-  password: process.env.DEV_DB_PASSWORD,
-  database: process.env.DEV_DB_NAME,
-  port: process.env.DEV_DB_PORT || 5432,
-  max: 10,
-});
+const env = process.env.NODE_ENV || "development";
 
-// Pool para ambiente de produção
-const prodPool = new Pool({
-  host: process.env.PROD_DB_HOST,
-  user: process.env.PROD_DB_USER,
-  password: process.env.PROD_DB_PASSWORD,
-  database: process.env.PROD_DB_NAME,
-  port: process.env.PROD_DB_PORT || 5432,
-  max: 10,
-});
+let pool;
 
-// Escolhe o pool baseado no NODE_ENV
-const pool = process.env.NODE_ENV === "production" ? prodPool : devPool;
+if (env === "production") {
+  const { Pool } = require("pg");
+
+  pool = new Pool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 5432,
+    ssl: { rejectUnauthorized: false },
+    max: 10,
+  });
+
+  console.log("Banco utilizado: PostgreSQL (PRODUÇÃO)");
+} else {
+  const mariadb = require("mariadb");
+
+  pool = mariadb.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 3306,
+    connectionLimit: 10,
+  });
+
+  console.log("Banco utilizado: MariaDB (DESENVOLVIMENTO)");
+}
 
 module.exports = pool;

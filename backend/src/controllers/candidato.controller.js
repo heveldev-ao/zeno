@@ -1,65 +1,105 @@
 const pool = require("../config/db");
 
-// LISTAR TODOS OS CANDIDATOS
+const isProd = process.env.NODE_ENV === "production";
+
+// Função helper para adaptar retorno
+const getRows = (result) => (isProd ? result.rows : result);
+
+// LISTAR TODOS
 exports.listarCandidatos = async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM candidatos ORDER BY id ASC");
-    res.json(result.rows);
+    const query = "SELECT * FROM candidatos ORDER BY id ASC";
+    const result = await pool.query(query);
+    res.json(getRows(result));
   } catch (err) {
     console.error("Erro ao listar candidatos:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// BUSCAR CANDIDATO POR ID
+// BUSCAR POR ID
 exports.buscarCandidato = async (req, res) => {
   const { id } = req.params;
+
   try {
-    const result = await pool.query("SELECT * FROM candidatos WHERE id = $1", [id]);
-    if (result.rows.length === 0) {
+    const query = isProd
+      ? "SELECT * FROM candidatos WHERE id = $1"
+      : "SELECT * FROM candidatos WHERE id = ?";
+
+    const result = await pool.query(query, [id]);
+    const rows = getRows(result);
+
+    if (rows.length === 0) {
       return res.status(404).json({ error: "Candidato não encontrado" });
     }
-    res.json(result.rows[0]);
+
+    res.json(rows[0]);
   } catch (err) {
     console.error("Erro ao buscar candidato:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// CRIAR CANDIDATO
+// CRIAR
 exports.criarCandidato = async (req, res) => {
   const { nome, email, numBI } = req.body;
+
   if (!nome || !email || !numBI) {
     return res.status(400).json({ error: "Nome, email e número do BI são obrigatórios" });
   }
 
   try {
-    // Verificar duplicidade de email
-    const emailCheck = await pool.query("SELECT id FROM candidatos WHERE email = $1", [email]);
-    if (emailCheck.rows.length > 0) {
+    const emailQuery = isProd
+      ? "SELECT id FROM candidatos WHERE email = $1"
+      : "SELECT id FROM candidatos WHERE email = ?";
+
+    const biQuery = isProd
+      ? "SELECT id FROM candidatos WHERE numBI = $1"
+      : "SELECT id FROM candidatos WHERE numBI = ?";
+
+    const emailCheck = await pool.query(emailQuery, [email]);
+    const biCheck = await pool.query(biQuery, [numBI]);
+
+    if (getRows(emailCheck).length > 0) {
       return res.status(400).json({ error: "Já existe um candidato com este email" });
     }
 
-    // Verificar duplicidade de numBI
-    const biCheck = await pool.query("SELECT id FROM candidatos WHERE numBI = $1", [numBI]);
-    if (biCheck.rows.length > 0) {
+    if (getRows(biCheck).length > 0) {
       return res.status(400).json({ error: "Já existe um candidato com este número do BI" });
     }
 
-    // Inserir candidato
-    const result = await pool.query(
-      "INSERT INTO candidatos (nome, email, numBI) VALUES ($1, $2, $3) RETURNING id",
-      [nome, email, numBI]
-    );
+    if (isProd) {
+      const result = await pool.query(
+        "INSERT INTO candidatos (nome, email, numBI) VALUES ($1, $2, $3) RETURNING id",
+        [nome, email, numBI]
+      );
 
-    res.status(201).json({ id: result.rows[0].id, nome, email, numBI });
+      return res.status(201).json({
+        id: result.rows[0].id,
+        nome,
+        email,
+        numBI,
+      });
+    } else {
+      const result = await pool.query(
+        "INSERT INTO candidatos (nome, email, numBI) VALUES (?, ?, ?)",
+        [nome, email, numBI]
+      );
+
+      return res.status(201).json({
+        id: result.insertId,
+        nome,
+        email,
+        numBI,
+      });
+    }
   } catch (err) {
     console.error("Erro ao criar candidato:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ATUALIZAR CANDIDATO
+// ATUALIZAR
 exports.atualizarCandidato = async (req, res) => {
   const { id } = req.params;
   const { nome, email, numBI } = req.body;
@@ -69,31 +109,20 @@ exports.atualizarCandidato = async (req, res) => {
   }
 
   try {
-    // Verificar duplicidade de email em outros candidatos
-    const emailCheck = await pool.query(
-      "SELECT id FROM candidatos WHERE email = $1 AND id != $2",
-      [email, id]
-    );
-    if (emailCheck.rows.length > 0) {
-      return res.status(400).json({ error: "Outro candidato já possui este email" });
-    }
+    const query = isProd
+      ? "UPDATE candidatos SET nome = $1, email = $2, numBI = $3 WHERE id = $4 RETURNING id"
+      : "UPDATE candidatos SET nome = ?, email = ?, numBI = ? WHERE id = ?";
 
-    // Verificar duplicidade de numBI em outros candidatos
-    const biCheck = await pool.query(
-      "SELECT id FROM candidatos WHERE numBI = $1 AND id != $2",
-      [numBI, id]
-    );
-    if (biCheck.rows.length > 0) {
-      return res.status(400).json({ error: "Outro candidato já possui este número do BI" });
-    }
+    const result = await pool.query(query, [nome, email, numBI, id]);
 
-    const result = await pool.query(
-      "UPDATE candidatos SET nome = $1, email = $2, numBI = $3 WHERE id = $4 RETURNING id",
-      [nome, email, numBI, id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Candidato não encontrado" });
+    if (isProd) {
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Candidato não encontrado" });
+      }
+    } else {
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Candidato não encontrado" });
+      }
     }
 
     res.json({ id: Number(id), nome, email, numBI });
@@ -103,14 +132,27 @@ exports.atualizarCandidato = async (req, res) => {
   }
 };
 
-// DELETAR CANDIDATO
+// DELETAR
 exports.deletarCandidato = async (req, res) => {
   const { id } = req.params;
+
   try {
-    const result = await pool.query("DELETE FROM candidatos WHERE id = $1 RETURNING id", [id]);
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Candidato não encontrado" });
+    const query = isProd
+      ? "DELETE FROM candidatos WHERE id = $1 RETURNING id"
+      : "DELETE FROM candidatos WHERE id = ?";
+
+    const result = await pool.query(query, [id]);
+
+    if (isProd) {
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Candidato não encontrado" });
+      }
+    } else {
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Candidato não encontrado" });
+      }
     }
+
     res.json({ message: "Candidato deletado com sucesso" });
   } catch (err) {
     console.error("Erro ao deletar candidato:", err);
