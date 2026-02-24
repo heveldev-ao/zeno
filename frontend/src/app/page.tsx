@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listarCandidatos } from "../services/api";
+import { listarCandidatos, deletarCandidato, atualizarCandidato } from "../services/api";
 import Card from "../components/Card";
 import CandidatoTable from "../components/CandidatoTable";
 import { Candidato } from "../types/candidatos";
@@ -30,6 +30,31 @@ export default function Home() {
   const reprovados = 0;
   const pendentes = total - aprovados - reprovados;
 
+  // Função para deletar candidato
+  const handleDelete = async (id: number) => {
+    if (!confirm("Tem certeza que deseja deletar este candidato?")) return;
+    try {
+      await deletarCandidato(id);
+      setCandidatos(candidatos.filter((c) => c.id !== id));
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao deletar candidato");
+    }
+  };
+
+  // Função para atualizar candidato
+  const handleUpdate = async (candidato: Candidato) => {
+    try {
+      await atualizarCandidato(candidato); // chamar API PUT
+      setCandidatos(
+        candidatos.map((c) => (c.id === candidato.id ? candidato : c))
+      );
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao atualizar candidato");
+    }
+  };
+
   return (
     <main className="p-8 max-w-6xl mx-auto">
       <div className="flex justify-between items-center mb-6">
@@ -49,7 +74,12 @@ export default function Home() {
         <Card title="Pendentes" value={pendentes} color="#ffc107" />
       </div>
 
-      <CandidatoTable candidatos={candidatos} />
+      {/* Passando funções para o CandidatoTable */}
+      <CandidatoTable
+        candidatos={candidatos}
+        onDelete={handleDelete}
+        onUpdate={handleUpdate}
+      />
     </main>
   );
 }
