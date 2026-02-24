@@ -8,9 +8,19 @@ const getRows = (result) => (isProd ? result.rows : result);
 // LISTAR TODOS
 exports.listarCandidatos = async (req, res) => {
   try {
-    const query = "SELECT * FROM candidatos ORDER BY id ASC";
+    const query = `
+      SELECT 
+        id,
+        nome,
+        email,
+        "numBI" AS "numBI",
+        created_at
+      FROM candidatos
+      ORDER BY id ASC
+    `;
+
     const result = await pool.query(query);
-    res.json(getRows(result));
+    res.json(result.rows);
   } catch (err) {
     console.error("Erro ao listar candidatos:", err);
     res.status(500).json({ error: err.message });
