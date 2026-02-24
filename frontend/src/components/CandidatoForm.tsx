@@ -18,15 +18,41 @@ export default function CandidatoForm({ onSuccess }: Props) {
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
+  // Regex do BI: 9 dígitos + 2 letras maiúsculas + 3 dígitos
+  const numBIRegex = /^[0-9]{9}[A-Z]{2}[0-9]{3}$/;
+
+  const handleNumBIChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    // Permite apenas números e letras
+    if (/^[0-9A-Z]*$/.test(value)) {
+      setNumBI(value);
+    }
+  };
+
+  const validarCampos = (): string | null => {
+    if (!nome.trim()) return "⚠️ Nome é obrigatório.";
+    if (!email.trim()) return "⚠️ Email é obrigatório.";
+    if (!numBI.trim()) return "⚠️ Número do BI é obrigatório.";
+    if (!numBIRegex.test(numBI))
+      return "⚠️ Número do BI inválido. Formato esperado: 9 dígitos + 2 letras maiúsculas + 3 dígitos (Ex: 123456789AB123).";
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setMsg(null);
 
+    // Validação local antes de enviar para backend
+    const erro = validarCampos();
+    if (erro) {
+      setMsg({ type: "error", text: erro });
+      return; // **Não envia para o backend**
+    }
+
+    setLoading(true);
+
     try {
-      if (!API_BASE_URL) {
-        throw new Error("API URL não definida");
-      }
+      if (!API_BASE_URL) throw new Error("API URL não definida");
 
       const data: Candidato = { nome, email, numBI };
 
@@ -72,9 +98,7 @@ export default function CandidatoForm({ onSuccess }: Props) {
       {msg && (
         <div
           className={`mb-4 p-3 rounded-md shadow-md text-center ${
-            msg.type === "error"
-              ? "bg-red-100 text-red-800"
-              : "bg-green-100 text-green-800"
+            msg.type === "error" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
           }`}
         >
           {msg.text}
@@ -87,7 +111,6 @@ export default function CandidatoForm({ onSuccess }: Props) {
           placeholder="Nome completo"
           value={nome}
           onChange={(e) => setNome(e.target.value)}
-          required
         />
         <input
           className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 hover:border-blue-400"
@@ -95,14 +118,13 @@ export default function CandidatoForm({ onSuccess }: Props) {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          required
         />
         <input
           className="border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 hover:border-blue-400"
           placeholder="Número do BI"
           value={numBI}
-          onChange={(e) => setNumBI(e.target.value)}
-          required
+          onChange={handleNumBIChange}
+          maxLength={14}
         />
 
         <button
