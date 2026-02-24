@@ -3,7 +3,11 @@ const pool = require("../config/db");
 const isProd = process.env.NODE_ENV === "production";
 
 // Função helper para adaptar retorno
-const getRows = (result) => (isProd ? result.rows : result);
+// Função helper para pegar os dados de forma consistente
+const getRows = (result) => {
+  // PostgreSQL retorna result.rows, MariaDB/MySQL retorna result (array)
+  return result.rows ? result.rows : result;
+};
 
 // LISTAR TODOS
 exports.listarCandidatos = async (req, res) => {
@@ -11,7 +15,14 @@ exports.listarCandidatos = async (req, res) => {
     const query = "SELECT * FROM candidatos ORDER BY id ASC";
 
     const result = await pool.query(query);
-    res.json(result.rows);
+
+    // Padroniza o nome do campo para 'numBI' para o frontend
+    const rows = getRows(result).map((c) => ({
+      ...c,
+      numBI: c.numbi || c.numBI, // pega numbi do banco, mantém se já tiver numBI
+    }));
+
+    res.json(rows);
   } catch (err) {
     console.error("Erro ao listar candidatos:", err);
     res.status(500).json({ error: err.message });
