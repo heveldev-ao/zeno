@@ -16,30 +16,36 @@ export default function CandidatoForm({ onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "error" | "success"; text: string } | null>(null);
 
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMsg(null);
 
     try {
+      if (!API_BASE_URL) {
+        throw new Error("API URL não definida");
+      }
+
       const data: Candidato = { nome, email, numBI };
-      // chamar API e capturar resposta
-      const res = await fetch("http://localhost:5000/api/candidatos", {
+
+      const res = await fetch(`${API_BASE_URL}/api/candidatos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
 
       if (!res.ok) {
-        // ler o corpo da resposta para pegar a mensagem específica do backend
-        const errData = await res.json();
-        throw new Error(errData.error || "Erro ao cadastrar candidato");
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || "Erro ao cadastrar candidato");
       }
 
       setNome("");
       setEmail("");
       setNumBI("");
-      setMsg({ type: "success", text: `✅ Candidato cadastrado com sucesso!` });
+      setMsg({ type: "success", text: "✅ Candidato cadastrado com sucesso!" });
+
       onSuccess();
     } catch (error: any) {
       console.error(error);
@@ -66,7 +72,9 @@ export default function CandidatoForm({ onSuccess }: Props) {
       {msg && (
         <div
           className={`mb-4 p-3 rounded-md shadow-md text-center ${
-            msg.type === "error" ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+            msg.type === "error"
+              ? "bg-red-100 text-red-800"
+              : "bg-green-100 text-green-800"
           }`}
         >
           {msg.text}
