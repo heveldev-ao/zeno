@@ -1,6 +1,7 @@
 import { Candidato } from "../types/candidatos";
 
-const API_URL = "http://localhost:5000/api/candidatos";
+const API_BASE_URL = process.env.NEXT_API_URL;
+const API_URL = `${API_BASE_URL}/api/candidatos`;
 
 export const listarCandidatos = async (): Promise<Candidato[]> => {
   const res = await fetch(API_URL);
@@ -14,5 +15,6 @@ export const criarCandidato = async (data: Candidato) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+
   if (!res.ok) throw new Error("Erro ao criar candidato");
 };
