@@ -23,7 +23,7 @@ export default function CandidatoTable({ candidatos }: TableProps) {
               <td className="px-6 py-4">{c.id}</td>
               <td className="px-6 py-4">{c.nome}</td>
               <td className="px-6 py-4">{c.email}</td>
-              <td className="px-6 py-4">{c.numbi}</td>
+              <td className="px-6 py-4">{c.numBI}</td>
               <td className="px-6 py-4">{c.created_at ? new Date(c.created_at).toLocaleDateString() : ""}</td>
             </tr>
           ))}
