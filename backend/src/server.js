@@ -1,12 +1,23 @@
 // server.js
-require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+
+// Se estiver em desenvolvimento e existir o arquivo .env local, carrega ele
+if (process.env.NODE_ENV !== "production") {
+  const envPath = path.resolve(__dirname, ".env");
+  if (fs.existsSync(envPath)) {
+    require("dotenv").config({ path: envPath });
+    console.log("Arquivo .env local carregado");
+  }
+}
+
 const app = require("./app");
 
-// Usa a porta do Render ou fallback para 3000
+// Usa a porta do Render (via variável de ambiente) ou fallback
 const PORT = process.env.PORT || 3000;
 
-// Log do banco de dados para debug (opcional)
-console.log("Conectando ao banco em:", process.env.DB_HOST);
+console.log("Ambiente:", process.env.NODE_ENV);
+console.log("Banco utilizado:", process.env.NODE_ENV === "production" ? "PRODUÇÃO" : "DESENVOLVIMENTO");
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);

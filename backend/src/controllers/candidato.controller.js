@@ -1,76 +1,65 @@
 const pool = require("../config/db");
 
-// Função auxiliar para converter BigInt -> Number
-function safeJson(obj) {
-  return JSON.parse(JSON.stringify(obj, (_, value) =>
-    typeof value === 'bigint' ? Number(value) : value
-  ));
-}
-
+// LISTAR TODOS OS CANDIDATOS
 exports.listarCandidatos = async (req, res) => {
-  let conn;
   try {
-    conn = await pool.getConnection();
-    const candidatos = await conn.query("SELECT * FROM candidatos");
-    res.json(safeJson(candidatos));
+    const result = await pool.query("SELECT * FROM candidatos ORDER BY id ASC");
+    res.json(result.rows);
   } catch (err) {
+    console.error("Erro ao listar candidatos:", err);
     res.status(500).json({ error: err.message });
-  } finally {
-    if (conn) conn.release();
   }
 };
 
+// BUSCAR CANDIDATO POR ID
 exports.buscarCandidato = async (req, res) => {
   const { id } = req.params;
-  let conn;
   try {
-    conn = await pool.getConnection();
-    const candidato = await conn.query("SELECT * FROM candidatos WHERE id = ?", [id]);
-    if (candidato.length === 0) {
+    const result = await pool.query("SELECT * FROM candidatos WHERE id = $1", [id]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Candidato não encontrado" });
     }
-    res.json(safeJson(candidato[0]));
+    res.json(result.rows[0]);
   } catch (err) {
+    console.error("Erro ao buscar candidato:", err);
     res.status(500).json({ error: err.message });
-  } finally {
-    if (conn) conn.release();
   }
 };
 
+// CRIAR CANDIDATO
 exports.criarCandidato = async (req, res) => {
   const { nome, email, numBI } = req.body;
   if (!nome || !email || !numBI) {
     return res.status(400).json({ error: "Nome, email e número do BI são obrigatórios" });
   }
 
-  let conn;
   try {
-    conn = await pool.getConnection();
-
     // Verificar duplicidade de email
-    const emailExist = await conn.query("SELECT id FROM candidatos WHERE email = ?", [email]);
-    if (emailExist.length > 0) {
+    const emailCheck = await pool.query("SELECT id FROM candidatos WHERE email = $1", [email]);
+    if (emailCheck.rows.length > 0) {
       return res.status(400).json({ error: "Já existe um candidato com este email" });
     }
 
     // Verificar duplicidade de numBI
-    const biExist = await conn.query("SELECT id FROM candidatos WHERE numBI = ?", [numBI]);
-    if (biExist.length > 0) {
+    const biCheck = await pool.query("SELECT id FROM candidatos WHERE numBI = $1", [numBI]);
+    if (biCheck.rows.length > 0) {
       return res.status(400).json({ error: "Já existe um candidato com este número do BI" });
     }
 
-    // Inserção
-    const result = await conn.query("INSERT INTO candidatos (nome, email, numBI) VALUES (?, ?, ?)", [nome, email, numBI]);
+    // Inserir candidato
+    const result = await pool.query(
+      "INSERT INTO candidatos (nome, email, numBI) VALUES ($1, $2, $3) RETURNING id",
+      [nome, email, numBI]
+    );
 
-    res.status(201).json(safeJson({ id: result.insertId, nome, email, numBI }));
+    res.status(201).json({ id: result.rows[0].id, nome, email, numBI });
   } catch (err) {
     console.error("Erro ao criar candidato:", err);
     res.status(500).json({ error: err.message });
-  } finally {
-    if (conn) conn.release();
   }
 };
 
+// ATUALIZAR CANDIDATO
 exports.atualizarCandidato = async (req, res) => {
   const { id } = req.params;
   const { nome, email, numBI } = req.body;
@@ -79,54 +68,52 @@ exports.atualizarCandidato = async (req, res) => {
     return res.status(400).json({ error: "Nome, email e número do BI são obrigatórios" });
   }
 
-  let conn;
   try {
-    conn = await pool.getConnection();
-
     // Verificar duplicidade de email em outros candidatos
-    const emailExist = await conn.query("SELECT id FROM candidatos WHERE email = ? AND id != ?", [email, id]);
-    if (emailExist.length > 0) {
+    const emailCheck = await pool.query(
+      "SELECT id FROM candidatos WHERE email = $1 AND id != $2",
+      [email, id]
+    );
+    if (emailCheck.rows.length > 0) {
       return res.status(400).json({ error: "Outro candidato já possui este email" });
     }
 
     // Verificar duplicidade de numBI em outros candidatos
-    const biExist = await conn.query("SELECT id FROM candidatos WHERE numBI = ? AND id != ?", [numBI, id]);
-    if (biExist.length > 0) {
+    const biCheck = await pool.query(
+      "SELECT id FROM candidatos WHERE numBI = $1 AND id != $2",
+      [numBI, id]
+    );
+    if (biCheck.rows.length > 0) {
       return res.status(400).json({ error: "Outro candidato já possui este número do BI" });
     }
 
-    const result = await conn.query(
-      "UPDATE candidatos SET nome = ?, email = ?, numBI = ? WHERE id = ?",
+    const result = await pool.query(
+      "UPDATE candidatos SET nome = $1, email = $2, numBI = $3 WHERE id = $4 RETURNING id",
       [nome, email, numBI, id]
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Candidato não encontrado" });
     }
 
-    res.json(safeJson({ id: Number(id), nome, email, numBI }));
+    res.json({ id: Number(id), nome, email, numBI });
   } catch (err) {
     console.error("Erro ao atualizar candidato:", err);
     res.status(500).json({ error: err.message });
-  } finally {
-    if (conn) conn.release();
   }
 };
 
+// DELETAR CANDIDATO
 exports.deletarCandidato = async (req, res) => {
   const { id } = req.params;
-  let conn;
   try {
-    conn = await pool.getConnection();
-    const result = await conn.query("DELETE FROM candidatos WHERE id = ?", [id]);
-    if (result.affectedRows === 0) {
+    const result = await pool.query("DELETE FROM candidatos WHERE id = $1 RETURNING id", [id]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Candidato não encontrado" });
     }
     res.json({ message: "Candidato deletado com sucesso" });
   } catch (err) {
     console.error("Erro ao deletar candidato:", err);
     res.status(500).json({ error: err.message });
-  } finally {
-    if (conn) conn.release();
   }
 };
